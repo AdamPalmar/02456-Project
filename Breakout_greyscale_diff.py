@@ -36,16 +36,13 @@ print(autoencoder_model.output_shape, "Output shape of model")
 
 autoencoder_model.summary()
 
-plt.figure(figsize=(1, 1))
-
-last_frame = np.empty(shape=(1, 1, 210, 160))
-
 
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
-
-resized_img = np.empty(shape=(1, 1, 210, 160))
+f, axarr = plt.subplots(1, 3)
+last_frame = np.empty(shape=(1, 1, 210, 160))
+first_image = True
 
 while True:
     env.render()
@@ -54,31 +51,37 @@ while True:
     score += reward
     counter += 1
 
-    # print(observation.shape)
-    # print(abs(observation[1]))
-    # print("Reward",reward)
-    # print(counter)
-    # print(observation)
+    if not first_image:
 
-    resized_img = np.empty(shape=(1, 1, 210, 160))
-    grey = rgb2gray(observation)
-    resized_img[0] = grey.reshape((1, 210, 160))
-    autoencoder_model.fit(resized_img, resized_img,
-                          batch_size=1,
-                          nb_epoch=1,
-                          shuffle=False)
+        resized_img = np.empty(shape=(1, 1, 210, 160))
+        diff_image = np.empty(shape=(1, 1, 210, 160))
+        current_image_grey = rgb2gray(observation)
+        print(np.max(current_image_grey))
+        diff_image = (current_image_grey - last_frame)
+        resized_img[0] = diff_image.reshape((1, 210, 160))
 
-    prediction_img = autoencoder_model.predict(resized_img)
+        autoencoder_model.fit(resized_img, resized_img,
+                              batch_size=1,
+                              nb_epoch=1,
+                              shuffle=False)
 
-    # print(prediction_img.shape)
-    prediction_resized = prediction_img[0][0].reshape((210, 160))
-    # print(prediction_resized.shape)
-    # prediction_resized = normalize(prediction_resized, axis=1, norm='l1')
-    # print(prediction_resized.max(),"Max value")
-    # print(prediction_resized.min(), "min value")
+        prediction_img = autoencoder_model.predict(resized_img)
+        prediction_resized = prediction_img[0][0].reshape((210, 160))
+        # prediction_resized = diff_image[0][0].reshape((210, 160))
 
-    plt.imshow(prediction_resized, cmap='Greys_r')
-    plt.savefig("breakout-greyscale.png")
+        if counter % 2:
+            last_frame = current_image_grey
+
+        # prediction_resized[10:100][:] = -100
+        axarr[0].imshow(current_image_grey, cmap='Greys_r')
+        axarr[1].imshow(prediction_resized, cmap='Greys_r')
+        axarr[2].imshow(diff_image, cmap='Greys_r')
+        # plt.imshow(prediction_resized, cmap='Greys_r')
+        plt.savefig("breakout-greyscale-difference.png")
+
+    else:
+        last_frame = rgb2gray(observation)
+        first_image = False
 
     if done:
         print done, score
