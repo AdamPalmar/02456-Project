@@ -19,7 +19,7 @@ env.reset()
 score = 0
 counter = 0
 filter_size = 5
-image_size = 256
+image_size = 128
 border = 'same'
 timestamp = str(datetime.datetime.now())
 image_file_path = "pictures_log/"+timestamp
@@ -37,9 +37,7 @@ activation_function = LeakyReLU(alpha=0.3)
 
 input_img_observation = Input(shape=(1, image_size, image_size))
 
-encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(input_img_observation)
-encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
+encoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(input_img_observation)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
 encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
@@ -53,13 +51,10 @@ decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_m
 decoder = UpSampling2D((2, 2))(decoder)
 decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
-decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
+decoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
 
-
-output_layer = Convolution2D(1, 5, 5, activation='relu', border_mode=border)(decoder)
+output_layer = Convolution2D(1, 7, 7, activation='relu', border_mode=border)(decoder)
 
 ###     Network setup end         ###
 
@@ -95,8 +90,8 @@ while True:
     if not first_image:
 
         # Init image arrays
-        resized_img = np.empty(shape=(1, 1, image_size, image_size))
-        diff_image = np.empty(shape=(1, 1, image_size, image_size))
+        resized_img = np.zeros(shape=(1, 1, image_size, image_size))
+        diff_image = np.zeros(shape=(1, 1, image_size, image_size))
 
         # Converting to greyscale
         current_image_grey = rgb2gray(observation)
@@ -108,7 +103,18 @@ while True:
         diff_image = (current_image_grey - last_frame)
         # resized_img[0] = diff_image.reshape((1, image_size, image_size))
 
-        resized_img[0] = current_image_grey.reshape((1, image_size, image_size))
+        # This is the improvement
+        low_values_indices = diff_image < 0  # Where values are low
+        high_values_indices = diff_image > 0  # Where values are high
+        diff_image[low_values_indices] = 0  # All low values set to 0
+        diff_image[high_values_indices] = 1000
+
+        current_plus_diff = np.empty(shape=(1,image_size,image_size))
+        current_plus_diff = current_image_grey + diff_image
+
+        #This is to make sure that the input has the correct size
+        resized_img[0] = current_plus_diff.reshape((1, image_size, image_size))
+
 
 
         autoencoder_model.fit(resized_img, resized_img,
@@ -123,7 +129,7 @@ while True:
             last_frame = current_image_grey
 
         plt.title("Cur/diff/pred")
-        axarr[0].imshow(current_image_grey, cmap='Greys_r')
+        axarr[0].imshow(current_plus_diff, cmap='Greys_r')
         axarr[1].imshow(diff_image, cmap='Greys_r')
         axarr[2].imshow(prediction_resized, cmap='Greys_r')
 
