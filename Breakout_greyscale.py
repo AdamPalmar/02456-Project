@@ -38,11 +38,16 @@ autoencoder_model.summary()
 
 plt.figure(figsize=(1, 1))
 
+last_frame = np.empty(shape=(1, 1, 210, 160))
+
 
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
 
 first = True
+
+resized_img = np.empty(shape=(1, 1, 210, 160))
+
 while True:
     env.render()
     if not first:
