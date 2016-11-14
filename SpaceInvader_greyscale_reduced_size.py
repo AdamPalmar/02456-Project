@@ -36,30 +36,29 @@ first_image = True
 
 ###     Defining the network     ###
 activation_function = LeakyReLU(alpha=0.3)
-activation = 'sigmoid'
 
 
 input_img_observation = Input(shape=(1, image_size, image_size))
 
-encoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
+encoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(input_img_observation)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
+encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
+encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
 
 
 
 encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 
-decoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
+decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoded_state)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
 
-output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
+output_layer = Convolution2D(1, 7, 7, activation='relu', border_mode=border)(decoder)
 
 ###     Network setup end         ###
 
@@ -96,7 +95,7 @@ while True:
     if not first_image:
 
         # Init image arrays
-        resized_img = np.zeros(shape=(1, 1, image_size, image_size))
+        train_img = np.zeros(shape=(1, 1, image_size, image_size))
         diff_image = np.zeros(shape=(1, 1, image_size, image_size))
 
         # Converting to greyscale
@@ -116,19 +115,19 @@ while True:
         # diff_image[high_values_indices] = 10000
 
         current_plus_diff = np.empty(shape=(1,image_size,image_size))
-        current_plus_diff = diff_image + diff_image
+        current_plus_diff = current_image_grey + diff_image
 
         #This is to make sure that the input has the correct size
-        resized_img[0] = current_plus_diff.reshape((1, image_size, image_size))
+        train_img[0] = current_plus_diff.reshape((1, image_size, image_size))
 
 
 
-        autoencoder_model.fit(resized_img, resized_img,
+        autoencoder_model.fit(train_img, train_img,
                               batch_size=1,
                               nb_epoch=1,
                               shuffle=False)
 
-        prediction_img = autoencoder_model.predict(resized_img)
+        prediction_img = autoencoder_model.predict(train_img)
         prediction_resized = prediction_img[0][0].reshape((image_size, image_size))
 
         if counter % 2:
@@ -141,8 +140,6 @@ while True:
 
         plt.savefig(image_file_path + ".png")
 
-        print(prediction_resized)
-        print(prediction_resized.max())
 
     else:
         last_frame = rgb2gray(observation)
