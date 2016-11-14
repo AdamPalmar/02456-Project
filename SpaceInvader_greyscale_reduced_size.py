@@ -1,4 +1,5 @@
 import gym
+
 import time
 from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
@@ -11,7 +12,8 @@ from sklearn.preprocessing import normalize
 import datetime
 import file_writer
 
-env_string = 'Breakout-v0'
+
+env_string = "SpaceInvaders-v0"
 env = gym.make(env_string)
 env.reset()
 
@@ -22,10 +24,8 @@ filter_size = 5
 image_size = 128
 border = 'same'
 timestamp = str(datetime.datetime.now())
-path_to_save_image = "pictures_log/" + env_string + "/" + timestamp
-path_to_folder_save_images = "pictures_log/" + env_string
-
-
+image_file_path = "pictures_log/"+env_string+"/"+timestamp
+image_folder_path = "pictures_log/"+env_string
 
 f, axarr = plt.subplots(1, 3)
 last_frame = np.empty(shape=(1, 1, image_size, image_size))
@@ -36,29 +36,30 @@ first_image = True
 
 ###     Defining the network     ###
 activation_function = LeakyReLU(alpha=0.3)
+activation = 'sigmoid'
 
 
 input_img_observation = Input(shape=(1, image_size, image_size))
 
-encoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(input_img_observation)
+encoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
+encoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoder)
+encoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 
 
 
 encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 
-decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoded_state)
+decoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
+decoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(16, filter_size, filter_size, activation='relu', border_mode=border)(decoder)
+decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
 
-output_layer = Convolution2D(1, 7, 7, activation='relu', border_mode=border)(decoder)
+output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
 
 ###     Network setup end         ###
 
@@ -73,10 +74,10 @@ autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 summary = autoencoder_model.summary_to_txt()
 print(summary)
 
+file_writer.write_model_conf_to_file(model_summary=summary, timestamp=image_file_path,
+                                     path_to_file=env_string + "-model_configs.txt",
+                                     path_to_folder=image_folder_path)
 
-file_writer.write_model_conf_to_file(model_summary=summary, timestamp=path_to_save_image,
-                                     path_to_file=env_string+"-model_configs.txt",
-                                     path_to_folder=path_to_folder_save_images)
 
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
@@ -109,13 +110,13 @@ while True:
         # resized_img[0] = diff_image.reshape((1, image_size, image_size))
 
         # This is the improvement
-        low_values_indices = diff_image < 0  # Where values are low
-        high_values_indices = diff_image > 0  # Where values are high
-        diff_image[low_values_indices] = 0  # All low values set to 0
-        diff_image[high_values_indices] = 1000
+        # low_values_indices = diff_image < 0  # Where values are low
+        # high_values_indices = diff_image > 0  # Where values are high
+        # diff_image[low_values_indices] = 0  # All low values set to 0
+        # diff_image[high_values_indices] = 10000
 
         current_plus_diff = np.empty(shape=(1,image_size,image_size))
-        current_plus_diff = current_image_grey + diff_image
+        current_plus_diff = diff_image + diff_image
 
         #This is to make sure that the input has the correct size
         resized_img[0] = current_plus_diff.reshape((1, image_size, image_size))
@@ -134,11 +135,14 @@ while True:
             last_frame = current_image_grey
 
         plt.title("Cur/diff/pred")
-        axarr[0].imshow(current_plus_diff, cmap='Greys_r')
+        axarr[0].imshow(current_image_grey, cmap='Greys_r')
         axarr[1].imshow(diff_image, cmap='Greys_r')
         axarr[2].imshow(prediction_resized, cmap='Greys_r')
 
-        plt.savefig(path_to_save_image + ".png")
+        plt.savefig(image_file_path + ".png")
+
+        print(prediction_resized)
+        print(prediction_resized.max())
 
     else:
         last_frame = rgb2gray(observation)
