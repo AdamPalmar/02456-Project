@@ -20,13 +20,19 @@ filter_size = 5
 border = 'same'
 input_img_observation = Input(shape=(3, 210, 160))
 
-encoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(input_img_observation)
-encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
+encoder = Convolution2D(8, filter_size, filter_size, activation='relu',
+                        border_mode=border)(input_img_observation)
 
-decoder = Convolution2D(8, filter_size, filter_size, activation='relu', border_mode=border)(encoded_state)
+encoded_state = MaxPooling2D((2, 2), border_mode=border,
+                             name='encoded_latent_state')(encoder)
+
+decoder = Convolution2D(8, filter_size, filter_size, activation='relu',
+                        border_mode=border)(encoded_state)
+
 decoder = UpSampling2D((2, 2))(decoder)
 
-output_layer = Convolution2D(3, 5, 5, activation='relu', border_mode=border)(decoder)
+output_layer = Convolution2D(3, 5, 5, activation='relu',
+                             border_mode=border)(decoder)
 
 autoencoder_model = Model(input=input_img_observation, output=output_layer)
 
@@ -53,9 +59,9 @@ while True:
     # print(counter)
     # print(observation)
     resized_img = np.empty(shape=(1, 3, 210, 160))
-    resized_img[0] = observation.reshape((3, 210, 160))
+    resized_img[0] = observation
     # print(resized_img[0])
-    # print(resized_img.shape)
+    print(resized_img.shape)
     # print(resized_img.shape)
     autoencoder_model.fit(resized_img, resized_img,
                           batch_size=1,
