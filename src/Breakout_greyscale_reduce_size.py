@@ -28,40 +28,31 @@ path_to_folder_save_images = "pictures_log/" + env_string
 
 
 f, axarr = plt.subplots(1, 3)
-last_frame = np.empty(shape=(1, 1, image_size, image_size))
+last_frame = np.empty(shape=( 1, image_size, image_size,1))
 first_image = True
 #-------------------------#
 
 
 
 ###     Defining the network     ###
-activation_function = LeakyReLU(alpha=0.1)
+activation = LeakyReLU(alpha=0.15)
 
 
-input_img_observation = Input(shape=(1, image_size, image_size))
+input_img_observation = Input(shape=(image_size, image_size,1))
 
-encoder = Convolution2D(16, filter_size, filter_size, activation=activation_function, border_mode=border)(input_img_observation)
+encoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
 encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
-encoder = Convolution2D(8, filter_size, filter_size, activation=activation_function, border_mode=border)(encoder)
-encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
-encoder = Convolution2D(1, filter_size, filter_size, activation=activation_function, border_mode=border)(encoder)
-
+encoder = Convolution2D(4, filter_size, filter_size, activation=activation,border_mode=border)(encoder)
 
 encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
-
-decoder = Convolution2D(8, filter_size, filter_size, activation=activation_function, border_mode=border)(encoded_state)
-decoder = UpSampling2D((2, 2))(decoder)
-
-decoder = Convolution2D(8, filter_size, filter_size, activation=activation_function, border_mode=border)(decoder)
-decoder = UpSampling2D((2, 2))(decoder)
-
-decoder = Convolution2D(16, filter_size, filter_size, activation=activation_function, border_mode=border)(decoder)
+decoder = Convolution2D(16, filter_size, filter_size, activation=activation,border_mode=border)(encoded_state)
 decoder = UpSampling2D((4, 4))(decoder)
-# decoder = Convolution2D(16, filter_size, filter_size, activation=activation_function, border_mode=border)(decoder)
+decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = UpSampling2D((2, 2))(decoder)
+decoder = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 
-
-output_layer = Convolution2D(1, 7, 7, activation=activation_function, border_mode=border)(decoder)
+output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
 
 ###     Network setup end         ###
 
@@ -70,16 +61,16 @@ output_layer = Convolution2D(1, 7, 7, activation=activation_function, border_mod
 autoencoder_model = Model(input=input_img_observation, output=output_layer)
 
 
-opt_adam = Adam(lr=0.002)
+opt_adam = Adam()
 autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 
-summary = autoencoder_model.summary_to_txt()
-print(summary)
+###summary = autoencoder_model.summary_to_txt()
+autoencoder_model.summary()
 
 
-file_writer.write_model_conf_to_file(model_summary=summary, timestamp=path_to_save_image,
-                                     path_to_file=env_string+"-model_configs.txt",
-                                     path_to_folder=path_to_folder_save_images)
+#file_writer.write_model_conf_to_file(model_summary=summary, timestamp=path_to_save_image,
+#                                     path_to_file=env_string+"-model_configs.txt",
+#                                     path_to_folder=path_to_folder_save_images)
 
 def rgb2gray(rgb):
     return np.dot(rgb[..., :3], [0.299, 0.587, 0.114])
@@ -98,46 +89,42 @@ while True:
     if not first_image:
 
         # Init image arrays
-        train_img = np.zeros(shape=(1, 1, image_size, image_size))
-        diff_image = np.zeros(shape=(1, 1, image_size, image_size))
-
+        resized_img = np.zeros(shape=( 1, image_size, image_size,1))
+        diff_image = np.zeros(shape=( 1, image_size, image_size,1))
         # Converting to greyscale
         current_image_grey = rgb2gray(observation)
         # Resizing the image
-        current_image_grey = np.reshape(current_image_grey,(image_size, image_size))
-
+        current_image_grey = np.reshape(current_image_grey, (image_size, image_size))
         # Finding difference between current frame and last frame
         # Use if running diff
-        diff_image = (current_image_grey - last_frame)
+        diff_image = current_image_grey-last_frame
         # resized_img[0] = diff_image.reshape((1, image_size, image_size))
-
         # This is the improvement
-        low_values_indices = diff_image < 0  # Where values are low
+
+        low_values_indices = diff_image <= 0  # Where values are low
         high_values_indices = diff_image > 0  # Where values are high
         diff_image[low_values_indices] = 0  # All low values set to 0
         diff_image[high_values_indices] = 255
 
-        current_plus_diff = np.empty(shape=(1,image_size,image_size))
-        current_plus_diff = (current_image_grey * 0.01) + diff_image
+        current_plus_diff = np.empty(shape=(image_size,image_size,1))
+        current_plus_diff = current_image_grey * 0.4 + diff_image
 
         #This is to make sure that the input has the correct size
-        train_img[0] = diff_image.reshape((1, image_size, image_size))
+        resized_img[0] = current_plus_diff.reshape((image_size, image_size,1))
 
-
-
-        autoencoder_model.fit(train_img, train_img,
+        autoencoder_model.fit(resized_img, resized_img,
                               batch_size=1,
                               nb_epoch=1,
                               shuffle=False)
 
-        prediction_img = autoencoder_model.predict(train_img)
-        prediction_resized = prediction_img[0][0].reshape((image_size, image_size))
+        prediction_img = autoencoder_model.predict(resized_img)
+        prediction_resized = prediction_img.reshape((image_size, image_size))
 
         if counter % 2:
             last_frame = current_image_grey
 
         plt.title("Cur/diff/pred")
-        axarr[0].imshow(current_plus_diff, cmap='Greys_r')
+        axarr[0].imshow(current_image_grey*0.8, cmap='Greys_r')
         axarr[1].imshow(diff_image, cmap='Greys_r')
         axarr[2].imshow(prediction_resized, cmap='Greys_r')
 
