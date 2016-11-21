@@ -30,9 +30,6 @@ path_to_folder_save_images = "pictures_log/" + env_string
 f, axarr = plt.subplots(1, 3)
 last_frame = np.empty(shape=( 1, image_size, image_size,1))
 first_image = True
-#-------------------------#
-
-
 
 ###     Defining the network     ###
 activation = LeakyReLU(alpha=0.15)
