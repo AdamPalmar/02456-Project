@@ -118,6 +118,7 @@ while True:
         # This is to make sure that the input has the correct size
         resized_img[0] = current_plus_diff.reshape((image_size, image_size, 1))
 
+        #
         # train input 3 stacked frame
         # train output 1 frame future
         print(three_frame_stack[:, :, :, frame_stack_size - train_stack_size:frame_stack_size].shape)
