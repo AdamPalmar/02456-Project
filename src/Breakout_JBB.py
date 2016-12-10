@@ -1,6 +1,6 @@
 import gym
 import time
-from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D, Activation
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
 from keras.optimizers import SGD, Adam
 from keras.models import Model, Sequential
@@ -35,28 +35,17 @@ first_image = True
 activation = LeakyReLU(alpha=0.15)
 
 
-input_img_observation = Input(shape=(H, H, 4))
+autoencoder_model = Sequential()
+autoencoder_model.add(Convolution2D(16, filter_size, filter_size, border_mode=border, batch_input_shape=(1,H, H, 4)))
+autoencoder_model.add(Activation(activation))
+autoencoder_model.add(MaxPooling2D((2, 2), name='encoded_latent_state'))
+autoencoder_model.add(Convolution2D(16, filter_size, filter_size, border_mode=border))
+autoencoder_model.add(Activation(activation))
+autoencoder_model.add(UpSampling2D((2, 2)))
+autoencoder_model.add(Convolution2D(8, filter_size, filter_size, border_mode=border))
+autoencoder_model.add(Activation(activation))
 
-encoder = Convolution2D(16, filter_size, filter_size,
-                        activation=activation, border_mode=border)(input_img_observation)
-
-encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
-
-
-decoder = Convolution2D(16, filter_size, filter_size,
-                        activation=activation, border_mode=border)(encoded_state)
-decoder = UpSampling2D((2, 2))(decoder)
-
-decoder = Convolution2D(8, filter_size, filter_size,
-                        activation=activation, border_mode=border)(decoder)
-
-output_layer = Convolution2D(1, filter_size,filter_size,
-                             activation=activation, border_mode=border)(decoder)
-
-###     Network setup end         ###
-
-
-autoencoder_model = Model(input=input_img_observation, output=output_layer)
+# ###     Network setup end         ###
 
 
 opt_adam = Adam()
