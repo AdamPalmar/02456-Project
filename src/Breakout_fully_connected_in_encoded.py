@@ -1,6 +1,6 @@
 import gym
 import time
-from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D,Deconvolution2D
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
 from keras.optimizers import SGD, Adam
 from keras.models import Model, Sequential
@@ -10,8 +10,9 @@ from scipy.misc import imresize
 from sklearn.preprocessing import normalize
 import datetime
 import file_writer
+from keras.layers.core import Flatten , Reshape
 
-env_string = 'SpaceInvaders-v0'
+env_string = 'Breakout-v0'
 env = gym.make(env_string)
 env.reset()
 
@@ -20,11 +21,11 @@ score = 0
 counter = 0
 frame_counter = 0
 filter_size = 2
-image_size = 128
+image_size = 64
 
-frame_stack_size = 9
-num_frames_to_predict_future = 3
-train_stack_size = 5
+frame_stack_size = 10
+num_frames_to_predict_future = 1
+train_stack_size = 4
 border = 'same'
 timestamp = str(datetime.datetime.now())
 path_to_save_image = "pictures_log/" + env_string + "/" + timestamp
@@ -45,18 +46,27 @@ activation = LeakyReLU(alpha=0.15)
 input_img_observation = Input(shape=(image_size, image_size, train_stack_size))
 
 encoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
-# encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
-# encoder = Convolution2D(4, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
+encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
+encoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 
 encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
-# decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
-# decoder = UpSampling2D((4, 4))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
+flattern_layer = Flatten()(encoded_state)
+
+decoder_dense_layer = Dense(4096,activation=activation)(flattern_layer)
+
+reshape_layer = Reshape((8,8,64),input_shape=(4096,))(decoder_dense_layer)
+
+
+decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(reshape_layer)
+decoder = UpSampling2D((4, 4))(decoder)
+decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 
 output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
+
+
 
 ###     Network setup end         ###
 
@@ -86,6 +96,9 @@ while True:
 
     # env.action_space.sample()
     observation, reward, done, info = env.step(1)  # take a random action
+
+    #Normalizing1
+    observation = (observation - observation.mean())/255
     score += reward
     counter += 1
     # Resizeing image
@@ -150,10 +163,9 @@ while True:
         image_frame_in_past = np.reshape(train_frames[:, :, :, -1],
                                          (image_size, image_size))
 
-        print(train_frames.shape)
-        col = np.zeros((128, 128, 3), 'uint8')
-        col[..., 0] = prediction_resized * -1
-        col[..., 1] = current_image_grey * -0.5
+        col = np.zeros((image_size, image_size, 3), 'uint8')
+        # col[..., 0] = prediction_resized * -2
+        col[..., 1] = prediction_resized * -0.5
         col[..., 2] = 0
         axarr[0].imshow(image_frame_in_past, cmap='Greys_r')
         axarr[1].imshow(current_image_grey * 0.8, cmap='Greys_r')

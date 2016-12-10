@@ -1,6 +1,7 @@
 import gym
 import time
-from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D, \
+    Convolution3D, MaxPooling3D, UpSampling3D
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
 from keras.optimizers import SGD, Adam
 from keras.models import Model, Sequential
@@ -11,7 +12,7 @@ from sklearn.preprocessing import normalize
 import datetime
 import file_writer
 
-env_string = 'SpaceInvaders-v0'
+env_string = 'Breakout-v0'
 env = gym.make(env_string)
 env.reset()
 
@@ -42,21 +43,25 @@ first_image = True
 activation = LeakyReLU(alpha=0.15)
 
 # Input size is now 128*128*3
-input_img_observation = Input(shape=(image_size, image_size, train_stack_size))
+input_img_observation = Input(shape=(train_stack_size, image_size, image_size, 1))
 
-encoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
+encoder = Convolution3D(nb_filter=32, kernel_dim1=filter_size, kernel_dim2=filter_size, kernel_dim3=filter_size,
+                        activation=activation, border_mode=border)(input_img_observation)
 # encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
 # encoder = Convolution2D(4, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 
-encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
+encoded_state = MaxPooling3D((1, 2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 # decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
 # decoder = UpSampling2D((4, 4))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
-decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution3D(nb_filter=32, kernel_dim1=filter_size, kernel_dim2=filter_size, kernel_dim3=filter_size,
+                        activation=activation, border_mode=border)(encoded_state)
+decoder = UpSampling3D((1, 2, 2))(decoder)
 
-output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
+decoder = Convolution3D(nb_filter=16, kernel_dim1=filter_size, kernel_dim2=filter_size, kernel_dim3=filter_size,
+                        activation=activation, border_mode=border)(decoder)
+
+output_layer = Convolution3D(1, 7, 7, 7, activation=activation, border_mode=border)(decoder)
 
 ###     Network setup end         ###
 
@@ -125,7 +130,7 @@ while True:
         start = end - train_stack_size
         train_frames = three_frame_stack[:, :, :,
                        start:end]
-
+        print(train_frames.shape, "trainframes shape")
 
         autoencoder_model.fit(train_frames,
                               resized_img,

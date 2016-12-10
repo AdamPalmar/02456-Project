@@ -10,6 +10,7 @@ from scipy.misc import imresize
 from sklearn.preprocessing import normalize
 import datetime
 import file_writer
+from keras.layers.core import Flatten , Reshape
 
 env_string = 'Breakout-v0'
 env = gym.make(env_string)
@@ -20,10 +21,10 @@ score = 0
 counter = 0
 frame_counter = 0
 filter_size = 2
-image_size = 128
+image_size = 64
 
-frame_stack_size = 9
-num_frames_to_predict_future = 3
+frame_stack_size = 10
+num_frames_to_predict_future = 1
 train_stack_size = 5
 border = 'same'
 timestamp = str(datetime.datetime.now())
@@ -54,15 +55,27 @@ encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_st
 # decoder = UpSampling2D((4, 4))(decoder)
 decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 
 output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
+
+#adding the flattern layer in the end
+flattern_layer = Flatten()(output_layer)
+
+decoder_dense_layer = Dense(image_size*image_size,activation=activation)(flattern_layer)
+
+
+reshape_layer = Reshape((image_size,image_size,1),input_shape=(image_size*image_size,))(decoder_dense_layer)
+print(output_layer)
+print(decoder_dense_layer)
+print(flattern_layer)
+print(reshape_layer)
 
 ###     Network setup end         ###
 
 
 
-autoencoder_model = Model(input=input_img_observation, output=output_layer)
+autoencoder_model = Model(input=input_img_observation, output=reshape_layer)
 
 opt_adam = Adam()
 autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
@@ -151,9 +164,9 @@ while True:
                                          (image_size, image_size))
 
         print(train_frames.shape)
-        col = np.zeros((128, 128, 3), 'uint8')
-        col[..., 0] = prediction_resized * -1
-        col[..., 1] = current_image_grey * -0.5
+        col = np.zeros((image_size, image_size, 3), 'uint8')
+        # col[..., 0] = prediction_resized * -2
+        col[..., 1] = prediction_resized * -0.5
         col[..., 2] = 0
         axarr[0].imshow(image_frame_in_past, cmap='Greys_r')
         axarr[1].imshow(current_image_grey * 0.8, cmap='Greys_r')
