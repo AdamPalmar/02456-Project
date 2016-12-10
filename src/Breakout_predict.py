@@ -18,7 +18,7 @@ env.reset()
 # Environment variables#
 score = 0
 counter = 0
-filter_size = 5
+filter_size = 2
 image_size = 128
 border = 'same'
 timestamp = str(datetime.datetime.now())
@@ -89,8 +89,7 @@ def negToZero(diff):
 
 def addDiff(obs, shape):
     s=shape**2
-    scale=0.4
-
+    scale=0.02
     obs1=obs[range(s)]
     obs2=obs[range(s,2*s)]
     obs3=obs[range(2*s,3*s)]
@@ -150,7 +149,7 @@ while True:
     prediction_resized = prediction_img.reshape((image_size, image_size))
     col= np.zeros((128,128,3), 'uint8')
     col[..., 0] = prediction_resized*-1
-    col[..., 1] = futObs
+    col[..., 1] = futObs*-1
     col[..., 2] = 0
     plt.title("Cur/diff/pred")
     axarr[0].imshow(futObs, cmap='Greys_r')
