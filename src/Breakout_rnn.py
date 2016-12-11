@@ -1,6 +1,6 @@
 import gym
 import time
-from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D, LSTM
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
 from keras.optimizers import SGD, Adam
 from keras.models import Model, Sequential
@@ -75,7 +75,7 @@ def rgb2gray(rgb):
 
 
 for k in range(10):
-    env.render()
+    #env.render()
 
     observation, reward, done, info = env.step(env.action_space.sample())  # take a random action
     score += reward
@@ -125,7 +125,7 @@ for k in range(10):
         axarr[1].imshow(diff_image, cmap='Greys_r')
         axarr[2].imshow(prediction_resized, cmap='Greys_r')
 
-        plt.savefig(path_to_save_image + ".png")
+        #plt.savefig(path_to_save_image + ".png")
 
     else:
         last_frame = rgb2gray(observation)
@@ -138,23 +138,24 @@ for k in range(10):
         env.reset()
         counter = 0
 
-print autoencoder_model.layers[1].get_weights()
+#print len(autoencoder_model.layers[1].get_weights())
 #impl rnn
 encoder2 = Convolution2D(8, filter_size, filter_size, activation=activation, border_mode=border, weights=autoencoder_model.layers[1].get_weights())(input_img_observation)
 encoder2 = MaxPooling2D((4, 4), border_mode=border)(encoder)
-encoder2 = Convolution2D(8, filter_size, filter_size, activation=activation,border_mode=border, weights=autoencoder_model.layers[2].get_weights())(encoder)
-encoded_state2 = MaxPooling2D((4, 4), border_mode=border, name='encoded_latent_state',  weights=autoencoder_model.layers[3].get_weights())(encoder)
+encoder2 = Convolution2D(8, filter_size, filter_size, activation=activation,border_mode=border, weights=autoencoder_model.layers[3].get_weights())(encoder)
+encoded_state2 = MaxPooling2D((4, 4), border_mode=border)(encoder)
 
-rnn_model = Model(input=input_img_observation, output=encoded_state2)
-rnn_model.compile(optimizer=opt_adam, loss='mean_squared_error')
+encoded_model = Model(input=input_img_observation, output=encoded_state2)
+encoded_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 
 
-N=1000
-enc_size= 8
+N = 1000
+enc_size = 8
 
-rnn_obs=np.empty(shape=(N,image_size,image_size))
+#rnn_obs=np.empty(shape=(N,image_size,image_size))
+encoded_obs = np.empty(shape=(N,1,512))
 for i in range(N):
-    env.render()
+    #env.render()
     observation, reward, done, info = env.step(env.action_space.sample())  # take a random action
     observation = imresize(observation, size=(image_size, image_size, 3))
     # Resizeing image
@@ -163,14 +164,36 @@ for i in range(N):
     # Converting to greyscale
     current_image_grey = rgb2gray(observation)
     # Resizing the image
-    prediction_img = autoencoder_model.predict(resized_img)
-    prediction_resized = prediction_img.reshape((image_size, image_size))
-    #rnn_obs[i] = np.reshape(current_image_grey, (image_size, image_size))
-    rnn_obs[i]=current_image_grey
+    #prediction_img = autoencoder_model.predict(resized_img)
+    #prediction_resized = prediction_img.reshape((image_size, image_size))
 
+    img_resized = np.reshape(current_image_grey, (1,128,128,1))
+    encoded_img = encoded_model.predict(img_resized)
+    encoded_img_flatten = np.reshape(encoded_img, (1,512))
+    encoded_obs[i] = encoded_img_flatten
 
     if done:
         print done, score
-        print rnn_obs.max()
-        score = 0
+        print encoded_obs[0].shape
         env.reset()
+
+
+rnn_model = Sequential()
+rnn_model.add( LSTM(512, input_dim=512,input_length=1) )
+
+rnn_model.compile(optimizer=opt_adam, loss='mean_squared_error')
+rnn_model.summary()
+
+## CREATE DATASET
+#x_train = np.empty(shape=(1,512))
+#y_train = np.empty(shape=(1,512))
+x_train = []
+y_train = []
+for i in range( len(encoded_obs)-1 ):
+    x_train.append(encoded_obs[i])
+    y_train.append(encoded_obs[i+1])
+
+x_train = np.asarray(x_train)
+y_train = np.asarray(y_train)
+
+rnn_model.fit(x_train, y_train, nb_epoch=100, batch_size=1)
