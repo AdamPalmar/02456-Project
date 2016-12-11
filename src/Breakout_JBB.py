@@ -25,8 +25,6 @@ timestamp = str(datetime.datetime.now())
 path_to_save_image = "pictures_log/" + env_string + "/" + timestamp
 path_to_folder_save_images = "pictures_log/" + env_string
 H=image_size
-L=image_size*4
-
 
 f, axarr = plt.subplots(1, 3)
 first_image = True
@@ -35,19 +33,20 @@ first_image = True
 activation = LeakyReLU(alpha=0.15)
 
 
-autoencoder_model = Sequential()
-autoencoder_model.add(Convolution2D(16, filter_size, filter_size, border_mode=border, batch_input_shape=(1,H, H, 4)))
-autoencoder_model.add(Activation(activation))
-autoencoder_model.add(MaxPooling2D((2, 2), name='encoded_latent_state'))
-autoencoder_model.add(Convolution2D(16, filter_size, filter_size, border_mode=border))
-autoencoder_model.add(Activation(activation))
-autoencoder_model.add(UpSampling2D((2, 2)))
-autoencoder_model.add(Convolution2D(8, filter_size, filter_size, border_mode=border))
-autoencoder_model.add(Activation(activation))
-
+model = Sequential()
+model.add(Convolution2D(2, filter_size, filter_size,
+                        batch_input_shape=(1, H, H, 4), border_mode=border))
+model.add(Activation(activation))
+model.add(MaxPooling2D((2, 2), name='encoded_latent_state'))
+model.add(Convolution2D(2, filter_size, filter_size, border_mode=border))
+model.add(Activation(activation))
+model.add(UpSampling2D((2, 2)))
+model.add(Convolution2D(2, filter_size, filter_size, border_mode=border))
+model.add(Activation(activation))
+model.add(Convolution2D(1, filter_size, filter_size, border_mode=border))
 # ###     Network setup end         ###
 
-
+autoencoder_model = model
 opt_adam = Adam()
 autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 
@@ -78,7 +77,7 @@ def negToZero(diff):
 
 def addDiff(obs, shape):
     s=shape**2
-    scale=0.02
+    scale=0.4
     obs1=obs[range(s)]
     obs2=obs[range(s,2*s)]
     obs3=obs[range(2*s,3*s)]
@@ -110,7 +109,7 @@ while True:
         obs, _, _, _ = env.step(action)  # take a random action
         obs = reToG(obs, image_size)
         observation = np.append(observation,obs)
-        print observation.shape
+
 
     action = env.action_space.sample() # future action will be reused as first action
     futObs, _, _, _ = env.step(action)  # take a random action
@@ -134,7 +133,6 @@ while True:
                           shuffle=False)
 
     prediction_img = autoencoder_model.predict(resized_img)
-    print prediction_img.shape
     prediction_resized = prediction_img.reshape((image_size, image_size))
     col= np.zeros((128,128,3), 'uint8')
     col[..., 0] = prediction_resized*-1
