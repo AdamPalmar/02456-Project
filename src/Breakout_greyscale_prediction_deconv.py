@@ -1,6 +1,7 @@
 import gym
 import time
-from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import Input, Dense, Convolution2D, MaxPooling2D, UpSampling2D, ZeroPadding2D, AveragePooling2D, \
+    Deconvolution2D
 from keras.layers.advanced_activations import LeakyReLU, ELU, PReLU
 from keras.optimizers import SGD, Adam
 from keras.models import Model, Sequential
@@ -11,7 +12,7 @@ from sklearn.preprocessing import normalize
 import datetime
 import file_writer
 
-env_string = 'Breakout-v0'
+env_string = 'SpaceInvaders-v0'
 env = gym.make(env_string)
 env.reset()
 
@@ -20,12 +21,12 @@ score = 0
 counter = 0
 frame_counter = 0
 filter_size = 2
-image_size = 128*2
+image_size = 128
 batch_size = 32
 
 frame_stack_size = 9
-num_frames_to_predict_future = 5
-train_stack_size = 3
+num_frames_to_predict_future = 3
+train_stack_size = 5
 border = 'same'
 timestamp = str(datetime.datetime.now())
 path_to_save_image = "pictures_log/" + env_string + "/" + timestamp
@@ -45,18 +46,18 @@ activation = LeakyReLU(alpha=0.15)
 # Input size is now 128*128*3
 input_img_observation = Input(shape=(image_size, image_size, train_stack_size))
 
-encoder = Convolution2D(128, 7, 7, activation=activation, border_mode=border)(input_img_observation)
-encoder = Convolution2D(128, 4, 4, activation=activation, border_mode=border)(encoder)
+encoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
 # encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
 # encoder = Convolution2D(4, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 
-# encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
+encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 # decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
 # decoder = UpSampling2D((4, 4))(decoder)
-decoder = Convolution2D(128, 5, 5, activation=activation, border_mode=border)(encoder)
-# decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(128, 5, 5, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
+decoder = UpSampling2D((2, 2))(decoder)
+decoder = Deconvolution2D(32, filter_size, filter_size,output_shape=(None,128,128,32),input_shape=(64,64,32), subsample=(2,2),activation=activation,border_mode=border)(encoded_state)
+decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 
 output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
 
@@ -66,7 +67,7 @@ output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)
 
 autoencoder_model = Model(input=input_img_observation, output=output_layer)
 
-opt_adam = Adam(lr=0.0005)
+opt_adam = Adam()
 autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 
 ###summary = autoencoder_model.summary_to_txt()
@@ -119,7 +120,7 @@ while True:
         current_plus_diff = current_image_grey * 0.1 + diff_image
 
         # This is to make sure that the input has the correct size
-        resized_img[0] = diff_image.reshape((image_size, image_size, 1))
+        resized_img[0] = current_plus_diff.reshape((image_size, image_size, 1))
 
         #
         # train input 3 stacked frame
@@ -128,7 +129,6 @@ while True:
         start = end - train_stack_size
         train_frames = three_frame_stack[:, :, :,
                        start:end]
-
 
         autoencoder_model.fit(train_frames,
                               resized_img,
@@ -141,7 +141,8 @@ while True:
 
         # three_frame_stack[:, :, 2] = np.reshape(current_image_grey, (image_size, image_size, 1))
 
-        prediction_img = autoencoder_model.predict(train_frames)
+        prediction_img = autoencoder_model.predict(three_frame_stack[:, :, :,
+                                                   start:end])
 
         prediction_resized = prediction_img.reshape((image_size, image_size))
 
@@ -153,7 +154,7 @@ while True:
                                          (image_size, image_size))
 
         print(train_frames.shape)
-        col = np.zeros((image_size, image_size, 3), 'uint8')
+        col = np.zeros((128, 128, 3), 'uint8')
         col[..., 0] = prediction_resized * -1
         col[..., 1] = current_image_grey * -0.5
         col[..., 2] = 0

@@ -24,8 +24,8 @@ filter_size = 2
 image_size = 64
 
 frame_stack_size = 10
-num_frames_to_predict_future = 1
-train_stack_size = 5
+num_frames_to_predict_future = 5
+train_stack_size = 4
 border = 'same'
 timestamp = str(datetime.datetime.now())
 path_to_save_image = "pictures_log/" + env_string + "/" + timestamp
@@ -45,24 +45,24 @@ activation = LeakyReLU(alpha=0.15)
 # Input size is now 128*128*3
 input_img_observation = Input(shape=(image_size, image_size, train_stack_size))
 
-encoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
+encoder = Convolution2D(128, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
 # encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
 # encoder = Convolution2D(4, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
 
-encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
+# encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 # decoder = Convolution2D(16, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
 # decoder = UpSampling2D((4, 4))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(encoded_state)
-decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(128, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
+# decoder = UpSampling2D((2, 2))(decoder)
+decoder = Convolution2D(128, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
 
 output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
 
 #adding the flattern layer in the end
 flattern_layer = Flatten()(output_layer)
 
-decoder_dense_layer = Dense(image_size*image_size,activation=activation)(flattern_layer)
+decoder_dense_layer = Dense(image_size*image_size,activation='relu')(flattern_layer)
 
 
 reshape_layer = Reshape((image_size,image_size,1),input_shape=(image_size*image_size,))(decoder_dense_layer)
@@ -77,7 +77,7 @@ print(reshape_layer)
 
 autoencoder_model = Model(input=input_img_observation, output=reshape_layer)
 
-opt_adam = Adam()
+opt_adam = Adam(lr=0.0005)
 autoencoder_model.compile(optimizer=opt_adam, loss='mean_squared_error')
 
 ###summary = autoencoder_model.summary_to_txt()
@@ -143,7 +143,7 @@ while True:
         autoencoder_model.fit(train_frames,
                               resized_img,
                               batch_size=1,
-                              nb_epoch=1,
+                              nb_epoch=10,
                               shuffle=False)
 
         three_frame_stack[:, :, :, :frame_stack_size - 1] = three_frame_stack[:, :, :, 1:frame_stack_size]
@@ -165,8 +165,8 @@ while True:
 
         print(train_frames.shape)
         col = np.zeros((image_size, image_size, 3), 'uint8')
-        # col[..., 0] = prediction_resized * -2
-        col[..., 1] = prediction_resized * -0.5
+        col[..., 0] = prediction_resized * -2
+        # col[..., 1] = current_image_grey * -0.5
         col[..., 2] = 0
         axarr[0].imshow(image_frame_in_past, cmap='Greys_r')
         axarr[1].imshow(current_image_grey * 0.8, cmap='Greys_r')
@@ -186,7 +186,7 @@ while True:
             frame_counter += 1
 
     if done:
-        print done, score
+        print (done, score)
         score = 0
         env.reset()
         counter = 0

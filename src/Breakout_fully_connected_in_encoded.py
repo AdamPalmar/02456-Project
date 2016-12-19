@@ -45,24 +45,27 @@ activation = LeakyReLU(alpha=0.15)
 # Input size is now 128*128*3
 input_img_observation = Input(shape=(image_size, image_size, train_stack_size))
 
-encoder = Convolution2D(32, filter_size, filter_size, activation=activation, border_mode=border)(input_img_observation)
-encoder = MaxPooling2D((4, 4), border_mode=border)(encoder)
-encoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(encoder)
+encoder = Convolution2D(32, 8, 8, activation=activation, border_mode=border)(input_img_observation)
+encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
+encoder = Convolution2D(32, 6, 6, activation=activation, border_mode=border)(encoder)
+encoder = MaxPooling2D((2, 2), border_mode=border)(encoder)
+encoder = Convolution2D(32, 6, 6, activation=activation, border_mode=border)(encoder)
 
 encoded_state = MaxPooling2D((2, 2), border_mode=border, name='encoded_latent_state')(encoder)
 
 flattern_layer = Flatten()(encoded_state)
 
-decoder_dense_layer = Dense(4096,activation=activation)(flattern_layer)
+decoder_dense_layer = Dense(2048,activation=activation)(flattern_layer)
 
-reshape_layer = Reshape((8,8,64),input_shape=(4096,))(decoder_dense_layer)
+reshape_layer = Reshape((8,8,32),input_shape=(2048,))(decoder_dense_layer)
 
-
-decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(reshape_layer)
-decoder = UpSampling2D((4, 4))(decoder)
-decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(32, 6, 6, activation=activation, border_mode=border)(reshape_layer)
 decoder = UpSampling2D((2, 2))(decoder)
-decoder = Convolution2D(64, filter_size, filter_size, activation=activation, border_mode=border)(decoder)
+decoder = Convolution2D(32, 6, 6, activation=activation, border_mode=border)(decoder)
+decoder = UpSampling2D((2, 2))(decoder)
+decoder = Convolution2D(32, 6, 6, activation=activation, border_mode=border)(decoder)
+decoder = UpSampling2D((2, 2))(decoder)
+decoder = Convolution2D(32, 8, 8, activation=activation, border_mode=border)(decoder)
 
 output_layer = Convolution2D(1, 7, 7, activation=activation, border_mode=border)(decoder)
 
@@ -185,7 +188,7 @@ while True:
             frame_counter += 1
 
     if done:
-        print done, score
+        print (done, score)
         score = 0
         env.reset()
         counter = 0
